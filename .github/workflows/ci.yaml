@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+
+env:
+  EARTHLY_VERSION: 0.7.20
+
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: earthly/actions-setup@v1
+        with:
+          version: ${{ env.EARTHLY_VERSION }}
+          use-cache: true
+      - uses: actions/checkout@v3
+
+      - name: Lint
+        run: earthly --ci +lint
+
+      - name: Test
+        run: earthly --ci +test
