@@ -5,6 +5,7 @@ ARG --global golangci_lint_version=1.54.2
 
 go:
   FROM golang:$go_version-alpine
+  ENV CGO_ENABLED=0
   WORKDIR /lru
   COPY --dir internal lru .
   COPY go.mod go.sum .
