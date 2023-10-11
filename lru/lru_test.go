@@ -143,12 +143,12 @@ func Test_GetterPanics(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_WithAfterEvict(t *testing.T) {
+func Test_WithOnEvict(t *testing.T) {
 	t.Parallel()
 
 	c := New(
 		WithTTL[int, string](time.Nanosecond),
-		WithAfterEvict[int, string](func(ctx context.Context, v string) error {
+		WithOnEvict[int, string](func(ctx context.Context, v string) error {
 			panic("panic")
 		}),
 	)

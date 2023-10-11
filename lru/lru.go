@@ -26,14 +26,14 @@ type getterResult[V any] struct {
 
 // Cache is a least recently used cache.
 type Cache[K comparable, V any] struct {
-	n          int
-	ttl        time.Duration
-	getter     Getter[K, V]
-	afterEvict AfterEvict[V]
-	cache      *list.List[listValue[K, V]]
-	lookup     map[K]*list.Element[listValue[K, V]]
-	pending    map[K][]chan getterResult[V]
-	mu         sync.RWMutex
+	n       int
+	ttl     time.Duration
+	getter  Getter[K, V]
+	onEvict OnEvict[V]
+	cache   *list.List[listValue[K, V]]
+	lookup  map[K]*list.Element[listValue[K, V]]
+	pending map[K][]chan getterResult[V]
+	mu      sync.RWMutex
 }
 
 // Size returns the max size of the cache.
@@ -190,7 +190,7 @@ func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V
 	c.cache.Remove(el)
 	delete(c.lookup, el.Value.key)
 
-	if c.afterEvict == nil {
+	if c.onEvict == nil {
 		return nil
 	}
 
@@ -200,7 +200,7 @@ func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V
 		}
 	}()
 
-	err = c.afterEvict(ctx, el.Value.val)
+	err = c.onEvict(ctx, el.Value.val)
 	if err != nil {
 		return fmt.Errorf("evict value for key: %v: %w", el.Value.key, err)
 	}
@@ -251,12 +251,12 @@ func WithTTL[K comparable, V any](ttl time.Duration) Option[K, V] {
 	}
 }
 
-type AfterEvict[V any] func(ctx context.Context, v V) error
+type OnEvict[V any] func(ctx context.Context, v V) error
 
-// WithAfterEvict sets a function to be called after evicting a value from the cache.
-func WithAfterEvict[K comparable, V any](afterEvict AfterEvict[V]) Option[K, V] {
+// WithOnEvict sets a function to be called after evicting a value from the cache.
+func WithOnEvict[K comparable, V any](onEvict OnEvict[V]) Option[K, V] {
 	return func(c *Cache[K, V]) {
-		c.afterEvict = afterEvict
+		c.onEvict = onEvict
 	}
 }
 
