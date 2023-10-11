@@ -190,3 +190,27 @@ func Test_Cache_Get_One_Key_Multiple_Times(t *testing.T) {
 	// Getter should be called only once, second time the value is from the cache.
 	assert.Equal(t, 1, getterExecCount)
 }
+
+func Test_Cache_Update_Key(t *testing.T) {
+	t.Parallel()
+
+	c := New[int, string]()
+
+	ctx := context.Background()
+
+	err := c.Set(ctx, 1, "one")
+	require.NoError(t, err)
+
+	err = c.Set(ctx, 1, "two")
+	require.NoError(t, err)
+
+	v, err := c.Get(ctx, 1)
+	require.NoError(t, err)
+
+	// The value should be updated.
+	require.Equal(t, "two", v)
+
+	// The length should be 1, as the key is updated, not added.
+	require.Equal(t, 1, c.Len())
+	require.Equal(t, 1, len(c.lookup))
+}
