@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func Test_Cache_WithSize(t *testing.T) {
+func Test_WithSize(t *testing.T) {
 	t.Parallel()
 
 	c := New(WithSize[int, int](10))
@@ -24,7 +24,7 @@ func Test_Cache_WithSize(t *testing.T) {
 	assert.Zero(t, c.Len())
 }
 
-func Test_Cache_WithTTL(t *testing.T) {
+func Test_WithTTL(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -43,11 +43,11 @@ func Test_Cache_WithTTL(t *testing.T) {
 
 	v, err = c.Get(ctx, 1)
 
-	require.ErrorContains(t, err, "getter is nil")
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Empty(t, v)
 }
 
-func Test_Cache_WithGetter(t *testing.T) {
+func Test_WithGetter(t *testing.T) {
 	t.Parallel()
 
 	err := quick.Check(func(key int, value string) bool {
@@ -74,7 +74,7 @@ func Test_Cache_WithGetter(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_Cache_WithGetter_Parallel(t *testing.T) {
+func Test_WithGetterParallel(t *testing.T) {
 	t.Parallel()
 
 	key, value := 1, "OK"
@@ -114,7 +114,7 @@ func Test_Cache_WithGetter_Parallel(t *testing.T) {
 	assert.EqualValues(t, 1, count)
 }
 
-func Test_Cache_Getter_Panics(t *testing.T) {
+func Test_GetterPanics(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -143,7 +143,7 @@ func Test_Cache_Getter_Panics(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_Cache_WithAfterEvict(t *testing.T) {
+func Test_WithAfterEvict(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -166,7 +166,7 @@ func Test_Cache_WithAfterEvict(t *testing.T) {
 	assert.Empty(t, v)
 }
 
-func Test_Cache_Get_One_Key_Multiple_Times(t *testing.T) {
+func Test_GetOneKeyMultipleTimes(t *testing.T) {
 	t.Parallel()
 
 	var getterExecCount int
@@ -191,7 +191,7 @@ func Test_Cache_Get_One_Key_Multiple_Times(t *testing.T) {
 	assert.Equal(t, 1, getterExecCount)
 }
 
-func Test_Cache_Update_Key(t *testing.T) {
+func Test_UpdateKey(t *testing.T) {
 	t.Parallel()
 
 	c := New[int, string]()
@@ -213,4 +213,28 @@ func Test_Cache_Update_Key(t *testing.T) {
 	// The length should be 1, as the key is updated, not added.
 	require.Equal(t, 1, c.Len())
 	require.Equal(t, 1, len(c.lookup))
+}
+
+func Test_EvictLeastRecent(t *testing.T) {
+	t.Parallel()
+
+	c := New[int, string](WithSize[int, string](2))
+
+	ctx := context.Background()
+
+	err := c.Set(ctx, 1, "one")
+	require.NoError(t, err)
+
+	err = c.Set(ctx, 2, "two")
+	require.NoError(t, err)
+
+	_, err = c.Get(ctx, 1)
+	require.NoError(t, err)
+
+	err = c.Set(ctx, 3, "three")
+	require.NoError(t, err)
+
+	v, err := c.Get(ctx, 2)
+	require.ErrorIs(t, err, ErrNotFound)
+	require.Empty(t, v)
 }

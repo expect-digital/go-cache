@@ -82,7 +82,7 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:iret
 
 func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { //nolint:ireturn
 	if c.getter == nil {
-		return zeroValue[V](), errors.New("getter is nil") //nolint:goerr113
+		return zeroValue[V](), fmt.Errorf("value not found for key: %v: %w", key, ErrNotFound)
 	}
 
 	c.mu.Lock() // TODO: not sure about position of this lock
