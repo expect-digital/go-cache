@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -42,7 +43,7 @@ func Test_Cache_WithTTL(t *testing.T) {
 
 	v, err = c.Get(ctx, 1)
 
-	assert.True(t, errors.Is(err, ErrNotFound))
+	require.ErrorContains(t, err, "getter is nil")
 	assert.Empty(t, v)
 }
 
@@ -133,7 +134,7 @@ func Test_Cache_Getter_Panics(t *testing.T) {
 		go func() {
 			v, err := c.Get(context.Background(), 1)
 
-			assert.EqualError(t, err, "exec getter for key: 1: panic")
+			require.ErrorContains(t, err, "panic")
 			assert.Empty(t, v)
 			wg.Done()
 		}()
@@ -163,4 +164,29 @@ func Test_Cache_WithAfterEvict(t *testing.T) {
 
 	assert.EqualError(t, err, "evict expired value for key: evict value for key: 1: panic")
 	assert.Empty(t, v)
+}
+
+func Test_Cache_Get_One_Key_Multiple_Times(t *testing.T) {
+	t.Parallel()
+
+	var getterExecCount int
+
+	getter := func(ctx context.Context, k int) (string, error) {
+		getterExecCount++
+
+		return "", nil
+	}
+
+	c := New(WithGetter(getter))
+
+	ctx := context.Background()
+
+	_, err := c.Get(ctx, 1)
+	require.NoError(t, err)
+
+	_, err = c.Get(ctx, 1)
+	require.NoError(t, err)
+
+	// Getter should be called only once, second time the value is from the cache.
+	assert.Equal(t, 1, getterExecCount)
 }

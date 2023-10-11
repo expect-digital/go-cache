@@ -14,6 +14,11 @@ const defaultSize = 1024
 
 var ErrNotFound = errors.New("not found")
 
+// zeroValue returns the zero value of the type.
+func zeroValue[T any]() (zero T) { //nolint:ireturn
+	return
+}
+
 type getterResult[V any] struct {
 	err   error
 	value V
@@ -28,7 +33,7 @@ type Cache[K comparable, V any] struct {
 	cache      *list.List[listValue[K, V]]
 	lookup     map[K]*list.Element[listValue[K, V]]
 	pending    map[K][]chan getterResult[V]
-	sync.RWMutex
+	mu         sync.RWMutex
 }
 
 // Size returns the max size of the cache.
@@ -43,53 +48,52 @@ func (c *Cache[K, V]) Len() int {
 
 // Get returns the value associated with the key from the cache. If the value is not found,
 // the value is populated by the getter.
+// TODO: too many locks?
 func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:ireturn
-	c.RLock()
+	c.mu.RLock()
 
-	el := c.lookup[key]
+	el, ok := c.lookup[key]
 
-	c.RUnlock()
+	c.mu.RUnlock()
 
-	if el == nil {
+	if !ok {
 		return c.populateByGetter(ctx, key)
 	}
 
 	if el.Value.exp.IsZero() || el.Value.exp.After(time.Now()) {
+		// Move the element to the front of the list, to signal it was recently used.
+		c.mu.Lock()
+		c.cache.MoveToFront(el)
+		c.mu.Unlock()
+
 		return el.Value.val, nil
 	}
 
-	c.Lock()
+	c.mu.Lock()
 	err := c.evict(ctx, el)
-	c.Unlock()
+	c.mu.Unlock()
 
 	if err != nil {
-		var v V
-
-		return v, fmt.Errorf("evict expired value for key: %w", err)
+		return zeroValue[V](), fmt.Errorf("evict expired value for key: %w", err)
 	}
 
 	return c.populateByGetter(ctx, key)
 }
 
 func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { //nolint:ireturn
-	c.Lock()
-
 	if c.getter == nil {
-		var v V
-
-		c.Unlock()
-
-		return v, fmt.Errorf("get value by getter for key: %v: %w", key, ErrNotFound)
+		return zeroValue[V](), errors.New("getter is nil") //nolint:goerr113
 	}
+
+	c.mu.Lock() // TODO: not sure about position of this lock
 
 	ch := make(chan getterResult[V], 1)
 	defer close(ch)
 
 	c.pending[key] = append(c.pending[key], ch)
-
 	n := len(c.pending[key])
 
-	c.Unlock()
+	c.mu.Unlock()
 
 	if n == 1 {
 		go c.execGetter(ctx, key)
@@ -97,7 +101,16 @@ func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { 
 
 	msg := <-ch
 
-	return msg.value, msg.err
+	if msg.err != nil {
+		return zeroValue[V](), fmt.Errorf("get value by getter for key: %v: %w", key, msg.err)
+	}
+
+	// Add the new value to the cache.
+	if err := c.Set(ctx, key, msg.value); err != nil {
+		return zeroValue[V](), fmt.Errorf("set value for key: %v: %w", key, err)
+	}
+
+	return msg.value, nil
 }
 
 func (c *Cache[K, V]) execGetter(ctx context.Context, key K) {
@@ -111,14 +124,14 @@ func (c *Cache[K, V]) execGetter(ctx context.Context, key K) {
 			err = fmt.Errorf("exec getter for key: %v: %v", key, r) //nolint:goerr113
 		}
 
-		c.Lock()
+		c.mu.Lock()
 
 		for _, ch := range c.pending[key] {
 			ch <- getterResult[V]{value: v, err: err}
 		}
 
 		delete(c.pending, key)
-		c.Unlock()
+		c.mu.Unlock()
 	}()
 
 	v, err = c.getter(ctx, key)
@@ -134,19 +147,29 @@ type listValue[K comparable, V any] struct {
 }
 
 func (c *Cache[K, V]) Set(ctx context.Context, key K, value V) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	var exp time.Time
-
 	if c.ttl > 0 {
 		exp = time.Now().Add(c.ttl)
 	}
 
-	el := c.cache.PushFront(listValue[K, V]{key: key, val: value, exp: exp})
+	// If the key already exists, update the value and move the element to the front of the list.
+	if el, ok := c.lookup[key]; ok {
+		el.Value.val = value
+		el.Value.exp = exp // TODO: what should happen with exp when updating value?
 
+		c.cache.MoveToFront(el)
+
+		return nil
+	}
+
+	// If the key does not exist, add the value to the cache and move the element to the front of the list.
+	el := c.cache.PushFront(listValue[K, V]{key: key, val: value, exp: exp})
 	c.lookup[key] = el
 
+	// In favor of optimizing the speed of Set, evicting happens only when the cache is full.
 	if c.cache.Len() <= c.n {
 		return nil
 	}

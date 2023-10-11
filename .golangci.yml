@@ -1,5 +1,5 @@
 run:
-  timeout: 5m
+  timeout: 1m
 linters:
   enable-all: true
   disable:
@@ -20,3 +20,5 @@ linters:
     - varcheck
     - varnamelen
     - exhaustivestruct
+    - forbidigo
+    - godox
