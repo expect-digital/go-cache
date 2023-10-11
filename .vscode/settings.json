@@ -6,5 +6,7 @@
   "go.formatTool": "gofumpt",
   "go.lintOnSave": "workspace",
   "go.lintTool": "golangci-lint",
-  "go.testFlags": []
+  "go.testFlags": [
+    "-v",
+  ]
 }

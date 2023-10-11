@@ -1,6 +1,6 @@
 VERSION 0.7
 
-ARG --global go_version=1.21.2
+ARG --global go_version=1.18.10
 ARG --global golangci_lint_version=1.54.2
 
 go:

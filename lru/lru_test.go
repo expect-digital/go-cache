@@ -78,11 +78,11 @@ func Test_Cache_WithGetter_Parallel(t *testing.T) {
 
 	key, value := 1, "OK"
 
-	var count atomic.Int32
+	var count int32
 
 	c := New(
 		WithGetter(func(ctx context.Context, k int) (string, error) {
-			count.Add(1)
+			atomic.AddInt32(&count, 1)
 			time.Sleep(50 * time.Millisecond) // arbitrary sleep to simulate network latency
 			if k == key {
 				return value, nil
@@ -110,7 +110,7 @@ func Test_Cache_WithGetter_Parallel(t *testing.T) {
 	}
 
 	assert.NoError(t, eg.Wait())
-	assert.Equal(t, int32(1), count.Load())
+	assert.EqualValues(t, 1, count)
 }
 
 func Test_Cache_Getter_Panics(t *testing.T) {
