@@ -143,7 +143,7 @@ func Test_GetterPanics(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_WithOnEvict(t *testing.T) {
+func Test_OnEvictPanics(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -153,16 +153,62 @@ func Test_WithOnEvict(t *testing.T) {
 		}),
 	)
 
+	ctx := context.Background()
+
+	err := c.Set(ctx, 1, "one")
+	assert.NoError(t, err)
+
 	time.Sleep(time.Millisecond)
+
+	v, err := c.Get(ctx, 1)
+
+	assert.EqualError(t, err, "evict expired value: evict value for key: 1: panic")
+	assert.Empty(t, v)
+}
+
+func Test_OnEvictReturnsError(t *testing.T) {
+	t.Parallel()
+
+	c := New(
+		WithTTL[int, string](time.Nanosecond),
+		WithOnEvict[int, string](func(ctx context.Context, v string) error {
+			return errors.New("oops") //nolint:goerr113
+		}),
+	)
 
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
 	assert.NoError(t, err)
 
+	time.Sleep(time.Millisecond)
+
 	v, err := c.Get(ctx, 1)
 
-	assert.EqualError(t, err, "evict expired value for key: evict value for key: 1: panic")
+	assert.EqualError(t, err, "evict expired value: evict value for key: 1: oops")
+	assert.Empty(t, v)
+}
+
+func Test_OnEvictOK(t *testing.T) {
+	t.Parallel()
+
+	c := New(
+		WithTTL[int, string](time.Nanosecond),
+		WithOnEvict[int, string](func(ctx context.Context, v string) error {
+			return nil
+		}),
+	)
+
+	ctx := context.Background()
+
+	err := c.Set(ctx, 1, "one")
+	assert.NoError(t, err)
+
+	time.Sleep(time.Millisecond)
+
+	v, err := c.Get(ctx, 1)
+
+	assert.ErrorIs(t, err, ErrNotFound)
 	assert.Empty(t, v)
 }
 

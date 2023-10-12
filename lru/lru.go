@@ -41,7 +41,7 @@ func (c *Cache[K, V]) Size() int {
 	return c.n
 }
 
-// Len returns the length of the cache.
+// Len returns the length of the values stored in the cache.
 func (c *Cache[K, V]) Len() int {
 	return c.cache.Len()
 }
@@ -74,7 +74,7 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:iret
 	c.mu.Unlock()
 
 	if err != nil {
-		return zeroValue[V](), fmt.Errorf("evict expired value for key: %w", err)
+		return zeroValue[V](), fmt.Errorf("evict expired value: %w", err)
 	}
 
 	return c.populateByGetter(ctx, key)
@@ -85,7 +85,7 @@ func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { 
 		return zeroValue[V](), fmt.Errorf("value not found for key: %v: %w", key, ErrNotFound)
 	}
 
-	c.mu.Lock() // TODO: not sure about position of this lock
+	c.mu.Lock()
 
 	ch := make(chan getterResult[V], 1)
 	defer close(ch)
@@ -155,10 +155,10 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V) error {
 		exp = time.Now().Add(c.ttl)
 	}
 
-	// If the key already exists, update the value and move the element to the front of the list.
+	// If the key already exists, update the value and exp, and move the element to the front of the list.
 	if el, ok := c.lookup[key]; ok {
 		el.Value.val = value
-		el.Value.exp = exp // TODO: what should happen with exp when updating value?
+		el.Value.exp = exp
 
 		c.cache.MoveToFront(el)
 
@@ -220,12 +220,12 @@ func (c *Cache[K, V]) evictExpired(ctx context.Context) error {
 	el := c.cache.Front()
 
 	for el != nil {
-		if el.Value.exp.Before(now) {
-			c.cache.Remove(el)
+		if el.Value.exp.After(now) {
+			continue
+		}
 
-			if err := c.evict(ctx, el); err != nil {
-				return err
-			}
+		if err := c.evict(ctx, el); err != nil {
+			return err
 		}
 
 		el = el.Next()
