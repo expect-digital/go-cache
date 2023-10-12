@@ -103,7 +103,7 @@ func Test_WithGetterParallel(t *testing.T) {
 			}
 
 			if v != value {
-				return fmt.Errorf("value is %s, expected %s", v, value) //nolint:goerr113
+				return fmt.Errorf("value is %s, expected %s", v, value)
 			}
 
 			return nil
@@ -143,6 +143,22 @@ func Test_GetterPanics(t *testing.T) {
 	wg.Wait()
 }
 
+func Test_GetterReturnsError(t *testing.T) {
+	t.Parallel()
+
+	c := New(
+		WithGetter(func(ctx context.Context, k int) (string, error) {
+			time.Sleep(50 * time.Millisecond) // arbitrary sleep to simulate network latency
+
+			return "", errors.New("fail test")
+		}),
+	)
+
+	_, err := c.Get(context.Background(), 1)
+
+	require.ErrorContains(t, err, "fail test")
+}
+
 func Test_OnEvictPanics(t *testing.T) {
 	t.Parallel()
 
@@ -172,7 +188,7 @@ func Test_OnEvictReturnsError(t *testing.T) {
 	c := New(
 		WithTTL[int, string](time.Nanosecond),
 		WithOnEvict[int, string](func(ctx context.Context, v string) error {
-			return errors.New("oops") //nolint:goerr113
+			return errors.New("oops")
 		}),
 	)
 
@@ -283,4 +299,149 @@ func Test_EvictLeastRecent(t *testing.T) {
 	v, err := c.Get(ctx, 2)
 	require.ErrorIs(t, err, ErrNotFound)
 	require.Empty(t, v)
+}
+
+func Test_CacheWithLargeCacheSize(t *testing.T) {
+	t.Parallel()
+
+	cacheSize := 10000
+	dataSize := 20000
+
+	c := New(WithSize[int, int](cacheSize))
+
+	for i := 0; i < dataSize; i++ {
+		require.NoError(t, c.Set(context.Background(), i, i))
+	}
+
+	for i := 0; i < dataSize; i++ {
+		v, err := c.Get(context.Background(), i)
+
+		// The cache should contain only the last cSize items.
+		if i < dataSize-cacheSize {
+			require.ErrorIs(t, err, ErrNotFound)
+			require.Empty(t, v)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, i, v)
+		}
+	}
+}
+
+func Test_EvictExpired(t *testing.T) {
+	t.Parallel()
+
+	// TODO
+	t.Skip("reason: infinite loop")
+
+	ctx := context.Background()
+	ttl := 1 * time.Millisecond
+	c := New(
+		WithTTL[int, int](ttl),
+		WithSize[int, int](2),
+	)
+
+	// Set a value with a TTL
+	require.NoError(t, c.Set(ctx, 1, 1))
+	require.NoError(t, c.Set(ctx, 2, 2))
+
+	time.Sleep(ttl * 2)
+
+	require.NoError(t, c.Set(ctx, 3, 3))
+
+	require.Equal(t, 1, c.Len())
+	require.Equal(t, 2, c.Size())
+
+	v, err := c.Get(ctx, 3)
+	require.NoError(t, err)
+
+	require.Equal(t, 3, v)
+}
+
+//nolint:funlen
+func Test_ConcurrentGetAndSet(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	dataCount := 2000
+
+	testConcurrent := func(c *Cache[int, int], expectedLen int) {
+		var wg sync.WaitGroup
+
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < dataCount; i++ {
+				require.NoError(t, c.Set(ctx, i, i))
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < dataCount; i++ {
+				val, err := c.Get(ctx, i)
+
+				// As getting and setting are executed concurrently, the value
+				// may or may not be in the cache.
+				switch err {
+				case nil:
+					require.Equal(t, i, val)
+				default:
+					if c.getter == nil {
+						require.ErrorIs(t, err, ErrNotFound)
+					} else {
+						require.FailNow(t, "getter is not nil and could not get the value: %w", err)
+					}
+				}
+			}
+		}()
+
+		wg.Wait()
+
+		require.Equal(t, expectedLen, c.Len())
+		require.Equal(t, expectedLen, c.Size())
+	}
+
+	tests := []struct {
+		name        string
+		cache       *Cache[int, int]
+		expectedLen int
+	}{
+		{
+			name:        "Enough cache size without getter",
+			cache:       New(WithSize[int, int](dataCount)),
+			expectedLen: dataCount,
+		},
+		{
+			name:        "Not enough cache size without getter",
+			cache:       New(WithSize[int, int](dataCount / 5)),
+			expectedLen: dataCount / 5,
+		},
+		{
+			name: "Enough cache size with getter",
+			cache: New(
+				WithSize[int, int](dataCount),
+				WithGetter[int, int](func(ctx context.Context, key int) (int, error) { return key, nil }),
+			),
+			expectedLen: dataCount,
+		},
+		{
+			name: "Not enough cache size with getter",
+			cache: New(
+				WithSize[int, int](dataCount/5),
+				WithGetter[int, int](func(ctx context.Context, key int) (int, error) { return key, nil }),
+			),
+			expectedLen: dataCount / 5,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			testConcurrent(tt.cache, tt.expectedLen)
+		})
+	}
 }

@@ -23,7 +23,7 @@ lint:
 
 test:
   FROM +go
-  RUN --mount=type=cache,target=/go/pkg/mod go test ./...
+  RUN --mount=type=cache,target=/go/pkg/mod go test ./... -count 10
 
 
 check:

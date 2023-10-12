@@ -50,34 +50,42 @@ func (c *Cache[K, V]) Len() int {
 // the value is populated by the getter.
 // TODO: too many locks?
 func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:ireturn
-	c.mu.RLock()
+	for {
+		c.mu.RLock()
 
-	el, ok := c.lookup[key]
+		el, ok := c.lookup[key]
+		if !ok {
+			c.mu.RUnlock()
 
-	c.mu.RUnlock()
+			return c.populateByGetter(ctx, key)
+		}
 
-	if !ok {
-		return c.populateByGetter(ctx, key)
+		if el.Value.exp.IsZero() || el.Value.exp.After(time.Now()) {
+			c.mu.RUnlock()
+
+			c.mu.Lock()
+			// Check again in case another goroutine removed the element.
+			if _, ok := c.lookup[key]; ok {
+				c.cache.MoveToFront(el)
+				c.mu.Unlock()
+
+				return el.Value.val, nil
+			}
+			c.mu.Unlock()
+		} else {
+			c.mu.RUnlock()
+
+			c.mu.Lock()
+			err := c.evict(ctx, el)
+			c.mu.Unlock()
+
+			if err != nil {
+				return zeroValue[V](), fmt.Errorf("evict expired value: %w", err)
+			}
+
+			return c.populateByGetter(ctx, key)
+		}
 	}
-
-	if el.Value.exp.IsZero() || el.Value.exp.After(time.Now()) {
-		// Move the element to the front of the list, to signal it was recently used.
-		c.mu.Lock()
-		c.cache.MoveToFront(el)
-		c.mu.Unlock()
-
-		return el.Value.val, nil
-	}
-
-	c.mu.Lock()
-	err := c.evict(ctx, el)
-	c.mu.Unlock()
-
-	if err != nil {
-		return zeroValue[V](), fmt.Errorf("evict expired value: %w", err)
-	}
-
-	return c.populateByGetter(ctx, key)
 }
 
 func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { //nolint:ireturn
@@ -121,7 +129,7 @@ func (c *Cache[K, V]) execGetter(ctx context.Context, key K) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("exec getter for key: %v: %v", key, r) //nolint:goerr113
+			err = fmt.Errorf("exec getter for key: %v: %v", key, r)
 		}
 
 		c.mu.Lock()
@@ -196,7 +204,7 @@ func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("evict value for key: %v: %v", el.Value.key, r) //nolint:goerr113
+			err = fmt.Errorf("evict value for key: %v: %v", el.Value.key, r)
 		}
 	}()
 
@@ -211,6 +219,7 @@ func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V
 // evictExpired removes expired values from the cache.
 // If ttl is 0, evictExpired is a no-op.
 // If ttl is > 0, expired values are removed from the cache.
+// TODO: Investigate infinite loop.
 func (c *Cache[K, V]) evictExpired(ctx context.Context) error {
 	if c.ttl == 0 {
 		return nil

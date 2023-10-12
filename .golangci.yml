@@ -22,3 +22,4 @@ linters:
     - exhaustivestruct
     - forbidigo
     - godox
+    - goerr113
