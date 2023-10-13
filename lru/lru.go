@@ -12,6 +12,7 @@ import (
 
 const defaultSize = 1024
 
+// ErrNotFound is an error that is returned when a requested key is not found in the cache, and no getter is set.
 var ErrNotFound = errors.New("not found")
 
 // zeroValue returns the zero value of the type.
@@ -24,7 +25,8 @@ type getterResult[V any] struct {
 	value V
 }
 
-// Cache is a least recently used cache.
+// Cache is a generic, concurrent-safe, least recently used (LRU) cache structure.
+// The zero value for Cache is an ready to use cache with size of 1024.
 type Cache[K comparable, V any] struct {
 	n       int
 	ttl     time.Duration
@@ -36,20 +38,27 @@ type Cache[K comparable, V any] struct {
 	mu      sync.RWMutex
 }
 
-// Size returns the max size of the cache.
+// Size returns the maximum size of the cache. The size is the maximum number of entries
+// the cache can hold before it starts evicting the least recently used entries.
 func (c *Cache[K, V]) Size() int {
 	return c.n
 }
 
-// Len returns the length of the values stored in the cache.
+// Len returns the current number of entries in the cache. This number will always be less than
+// or equal to the size returned by Size().
 func (c *Cache[K, V]) Len() int {
 	return c.cache.Len()
 }
 
-// Get returns the value associated with the key from the cache. If the value is not found,
-// the value is populated by the getter.
-// TODO: too many locks?
+/*
+Get retrieves the value associated with the provided key from the cache and moves it to the front of the cache.
+If the value is not found or has expired, the method attempts to populate it using the getter function, if provided.
+
+	cache.Get(ctx, 1) // cache[int, ...]
+	cache.Get(ctx, "key") // cache[string, ...]
+*/
 func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:ireturn
+	// TODO: too many locks?
 	for {
 		c.mu.RLock()
 
@@ -88,6 +97,7 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:iret
 	}
 }
 
+// populateByGetter populates the cache with the value returned by the getter.
 func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { //nolint:ireturn
 	if c.getter == nil {
 		return zeroValue[V](), fmt.Errorf("value not found for key: %v: %w", key, ErrNotFound)
@@ -121,6 +131,7 @@ func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { 
 	return msg.value, nil
 }
 
+// execGetter executes the getter function and sends the result to all pending channels.
 func (c *Cache[K, V]) execGetter(ctx context.Context, key K) {
 	var (
 		v   V
@@ -154,6 +165,26 @@ type listValue[K comparable, V any] struct {
 	exp time.Time
 }
 
+/*
+Set adds a value to the cache associated with the provided key and moves it to the front of the cache.
+
+If the key already exists in the cache, the method updates the value and its
+expiration time, and moves it to the front of the cache.
+If the key does not exist, the method adds the value to the cache
+and sets its expiration time based on the cache's TTL.
+
+If adding the value causes the cache to exceed its maximum size, the method evicts
+expired entries and if still exceeding the maximum size, the least recently used entry.
+
+	cache.Set(ctx, 1, "value") // cache[int, string]
+	cache.Set(ctx, "key", "value") // cache[string, string]
+
+	type user struct {
+		Id   int
+		Name string
+	}
+	cache.Set(ctx, 1, user{Id: 1, Name: "John Doe"})  // cache[int, user]
+*/
 func (c *Cache[K, V]) Set(ctx context.Context, key K, value V) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -245,7 +276,7 @@ func (c *Cache[K, V]) evictExpired(ctx context.Context) error {
 
 type Option[K comparable, V any] func(*Cache[K, V])
 
-// WithSize sets the max size of the cache.
+// WithSize is an Option that sets the max size of the cache.
 // If the cache is full, the least recently used value is evicted.
 func WithSize[K comparable, V any](n int) Option[K, V] {
 	return func(c *Cache[K, V]) {
@@ -253,33 +284,57 @@ func WithSize[K comparable, V any](n int) Option[K, V] {
 	}
 }
 
-// WithTTL sets the time to live for the cached values.
+// WithTTL is an Option that sets the time to live for the cached values.
+// If a value is expired, it is evicted from the cache.
 func WithTTL[K comparable, V any](ttl time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) {
 		c.ttl = ttl
 	}
 }
 
+/*
+OnEvict is a function type that defines a function to be called after evicting a value from the cache.
+
+	onEvicter := func(ctx context.Context, v user) error {
+		// Do something with the evicted value. Keep track of the evicted values, log them, etc.
+		return nil
+	}
+*/
 type OnEvict[V any] func(ctx context.Context, v V) error
 
-// WithOnEvict sets a function to be called after evicting a value from the cache.
+// WithOnEvict is an Option that sets a function to be called after evicting a value from the cache.
 func WithOnEvict[K comparable, V any](onEvict OnEvict[V]) Option[K, V] {
 	return func(c *Cache[K, V]) {
 		c.onEvict = onEvict
 	}
 }
 
+/*
+Getter is a function type that defines a function to be used to populate the cache.
+If the getter is set and no value found in the cache, the cache will populate the cache
+with the value returned by the getter.
+
+	type user struct {
+		ID   int
+		Name string
+	}
+
+	// cache[int,user]
+	getter := func(ctx context.Context, id int) (user, error) {
+		// Query the database or retrieve the value from any another source.
+		return user{ID: id, Name: "John Doe"}, nil
+	}
+*/
 type Getter[K comparable, V any] func(ctx context.Context, key K) (V, error)
 
-// WithGetter sets a function to be used to populate the cache.
-// If the getter is set and no value found in the cache, the cache will populate the cache
-// with the value returned by the getter.
+// WithGetter is an Option that sets a function to be used to populate the cache.
 func WithGetter[K comparable, V any](getter Getter[K, V]) Option[K, V] {
 	return func(c *Cache[K, V]) {
 		c.getter = getter
 	}
 }
 
+// New creates a new Cache with the provided options.
 func New[K comparable, V any](options ...Option[K, V]) *Cache[K, V] {
 	c := new(Cache[K, V])
 

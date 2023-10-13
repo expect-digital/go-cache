@@ -1,11 +1,13 @@
 /*
 Package lru implements a Least Recently Used (LRU) cache.
 
-The cache is safe for concurrent access, which makes it suitable for use in multi-goroutine applications.
+An LRU cache is a type of cache in which the least recently used entries
+are removed when the cache reaches its capacity.
+This makes it very useful for memory management in applications that require quick access to stored data.
+
+The cache is safe for concurrent access, making it suitable for use in multi-goroutine applications.
 
 # Example Usage
-
-## Basic
 
 The following example shows all basic operations of the cache.
 
@@ -58,8 +60,6 @@ The following example shows all basic operations of the cache.
 		// Get count of stored values in cache
 		fmt.Printf("Count of stored values in cache: %d\n", userCache.Len()) // Count of stored values in cache: 1
 	}
-
-## Advanced
 
 The following example shows how to use the cache with a getter function and a custom cache size.
 
