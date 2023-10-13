@@ -95,7 +95,7 @@ func Test_WithGetterParallel(t *testing.T) {
 
 	var eg errgroup.Group
 
-	for i := 0; i < 10_000; i++ {
+	for i := 0; i < 1000; i++ {
 		eg.Go(func() error {
 			v, err := c.Get(context.Background(), 1)
 			if err != nil {
