@@ -250,25 +250,21 @@ func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V
 // evictExpired removes expired values from the cache.
 // If ttl is 0, evictExpired is a no-op.
 // If ttl is > 0, expired values are removed from the cache.
-// TODO: Investigate infinite loop.
 func (c *Cache[K, V]) evictExpired(ctx context.Context) error {
 	if c.ttl == 0 {
 		return nil
 	}
 
 	now := time.Now()
-	el := c.cache.Front()
 
-	for el != nil {
-		if el.Value.exp.After(now) {
+	for _, v := range c.lookup {
+		if v.Value.exp.After(now) {
 			continue
 		}
 
-		if err := c.evict(ctx, el); err != nil {
+		if err := c.evict(ctx, v); err != nil {
 			return err
 		}
-
-		el = el.Next()
 	}
 
 	return nil

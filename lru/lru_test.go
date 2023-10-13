@@ -330,11 +330,9 @@ func Test_CacheWithLargeCacheSize(t *testing.T) {
 func Test_EvictExpired(t *testing.T) {
 	t.Parallel()
 
-	// TODO
-	t.Skip("reason: infinite loop")
-
 	ctx := context.Background()
-	ttl := 1 * time.Millisecond
+	ttl := 5 * time.Millisecond
+
 	c := New(
 		WithTTL[int, int](ttl),
 		WithSize[int, int](2),
