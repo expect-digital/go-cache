@@ -1,0 +1,12 @@
+{
+  "go.coverOnSave": true,
+  "go.coverOnSingleTest": true,
+  "go.coverOnSingleTestFile": true,
+  "editor.formatOnSave": true,
+  "go.formatTool": "gofumpt",
+  "go.lintOnSave": "workspace",
+  "go.lintTool": "golangci-lint",
+  "go.testFlags": [
+    "-v",
+  ]
+}
