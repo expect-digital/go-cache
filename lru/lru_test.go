@@ -32,11 +32,11 @@ func Test_WithTTL(t *testing.T) {
 	c := New(WithTTL[int, string](ttl))
 
 	err := c.Set(ctx, 1, "one")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	v, err := c.Get(ctx, 1)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "one", v)
 
 	time.Sleep(ttl)
@@ -53,7 +53,7 @@ func Test_WithGetter(t *testing.T) {
 	err := quick.Check(func(key int, value string) bool {
 		ctx := context.Background()
 
-		c := New(WithGetter(func(ctx context.Context, k int) (string, error) {
+		c := New(WithGetter(func(_ context.Context, k int) (string, error) {
 			if k == key {
 				return value, nil
 			}
@@ -82,9 +82,10 @@ func Test_WithGetterParallel(t *testing.T) {
 	var count int32
 
 	c := New(
-		WithGetter(func(ctx context.Context, k int) (string, error) {
+		WithGetter(func(_ context.Context, k int) (string, error) {
 			atomic.AddInt32(&count, 1)
 			time.Sleep(50 * time.Millisecond) // arbitrary sleep to simulate network latency
+
 			if k == key {
 				return value, nil
 			}
@@ -95,7 +96,7 @@ func Test_WithGetterParallel(t *testing.T) {
 
 	var eg errgroup.Group
 
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		eg.Go(func() error {
 			v, err := c.Get(context.Background(), 1)
 			if err != nil {
@@ -110,7 +111,7 @@ func Test_WithGetterParallel(t *testing.T) {
 		})
 	}
 
-	assert.NoError(t, eg.Wait())
+	require.NoError(t, eg.Wait())
 	assert.EqualValues(t, 1, count)
 }
 
@@ -118,7 +119,7 @@ func Test_GetterPanics(t *testing.T) {
 	t.Parallel()
 
 	c := New(
-		WithGetter(func(ctx context.Context, k int) (string, error) {
+		WithGetter(func(_ context.Context, _ int) (string, error) {
 			time.Sleep(50 * time.Millisecond) // arbitrary sleep to simulate network latency
 			panic("panic")
 		}),
@@ -130,11 +131,11 @@ func Test_GetterPanics(t *testing.T) {
 
 	wg.Add(n)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		go func() {
 			v, err := c.Get(context.Background(), 1)
 
-			require.ErrorContains(t, err, "panic")
+			assert.ErrorContains(t, err, "panic")
 			assert.Empty(t, v)
 			wg.Done()
 		}()
@@ -147,7 +148,7 @@ func Test_GetterReturnsError(t *testing.T) {
 	t.Parallel()
 
 	c := New(
-		WithGetter(func(ctx context.Context, k int) (string, error) {
+		WithGetter(func(_ context.Context, _ int) (string, error) {
 			time.Sleep(50 * time.Millisecond) // arbitrary sleep to simulate network latency
 
 			return "", errors.New("fail test")
@@ -164,7 +165,7 @@ func Test_OnEvictPanics(t *testing.T) {
 
 	c := New(
 		WithTTL[int, string](time.Nanosecond),
-		WithOnEvict[int, string](func(ctx context.Context, v string) error {
+		WithOnEvict[int](func(_ context.Context, _ string) error {
 			panic("panic")
 		}),
 	)
@@ -172,13 +173,13 @@ func Test_OnEvictPanics(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
 
-	assert.EqualError(t, err, "evict expired value: evict value for key: 1: panic")
+	require.EqualError(t, err, "evict expired value: evict value for key: 1: panic")
 	assert.Empty(t, v)
 }
 
@@ -187,7 +188,7 @@ func Test_OnEvictReturnsError(t *testing.T) {
 
 	c := New(
 		WithTTL[int, string](time.Nanosecond),
-		WithOnEvict[int, string](func(ctx context.Context, v string) error {
+		WithOnEvict[int](func(_ context.Context, _ string) error {
 			return errors.New("oops")
 		}),
 	)
@@ -195,13 +196,13 @@ func Test_OnEvictReturnsError(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
 
-	assert.EqualError(t, err, "evict expired value: evict value for key: 1: oops")
+	require.EqualError(t, err, "evict expired value: evict value for key: 1: oops")
 	assert.Empty(t, v)
 }
 
@@ -210,7 +211,7 @@ func Test_OnEvictOK(t *testing.T) {
 
 	c := New(
 		WithTTL[int, string](time.Nanosecond),
-		WithOnEvict[int, string](func(ctx context.Context, v string) error {
+		WithOnEvict[int](func(_ context.Context, _ string) error {
 			return nil
 		}),
 	)
@@ -218,13 +219,13 @@ func Test_OnEvictOK(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
 
-	assert.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, ErrNotFound)
 	assert.Empty(t, v)
 }
 
@@ -233,7 +234,7 @@ func Test_GetOneKeyMultipleTimes(t *testing.T) {
 
 	var getterExecCount int
 
-	getter := func(ctx context.Context, k int) (string, error) {
+	getter := func(_ context.Context, _ int) (string, error) {
 		getterExecCount++
 
 		return "", nil
@@ -274,13 +275,13 @@ func Test_UpdateKey(t *testing.T) {
 
 	// The length should be 1, as the key is updated, not added.
 	require.Equal(t, 1, c.Len())
-	require.Equal(t, 1, len(c.lookup))
+	require.Len(t, c.lookup, 1)
 }
 
 func Test_EvictLeastRecent(t *testing.T) {
 	t.Parallel()
 
-	c := New[int, string](WithSize[int, string](2))
+	c := New(WithSize[int, string](2))
 
 	ctx := context.Background()
 
@@ -309,11 +310,11 @@ func Test_CacheWithLargeCacheSize(t *testing.T) {
 
 	c := New(WithSize[int, int](cacheSize))
 
-	for i := 0; i < dataSize; i++ {
+	for i := range dataSize {
 		require.NoError(t, c.Set(context.Background(), i, i))
 	}
 
-	for i := 0; i < dataSize; i++ {
+	for i := range dataSize {
 		v, err := c.Get(context.Background(), i)
 
 		// The cache should contain only the last cSize items.
@@ -370,27 +371,27 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < dataCount; i++ {
-				require.NoError(t, c.Set(ctx, i, i))
+			for i := range dataCount {
+				assert.NoError(t, c.Set(ctx, i, i))
 			}
 		}()
 
 		go func() {
 			defer wg.Done()
 
-			for i := 0; i < dataCount; i++ {
+			for i := range dataCount {
 				val, err := c.Get(ctx, i)
 
 				// As getting and setting are executed concurrently, the value
 				// may or may not be in the cache.
 				switch err {
 				case nil:
-					require.Equal(t, i, val)
+					assert.Equal(t, i, val)
 				default:
 					if c.getter == nil {
-						require.ErrorIs(t, err, ErrNotFound)
+						assert.ErrorIs(t, err, ErrNotFound)
 					} else {
-						require.FailNow(t, "getter is not nil and could not get the value: %w", err)
+						assert.Fail(t, "getter is not nil and could not get the value", err)
 					}
 				}
 			}
@@ -421,7 +422,7 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 			name: "Enough cache size with getter",
 			cache: New(
 				WithSize[int, int](dataCount),
-				WithGetter[int, int](func(ctx context.Context, key int) (int, error) { return key, nil }),
+				WithGetter(func(_ context.Context, key int) (int, error) { return key, nil }),
 			),
 			expectedLen: dataCount,
 		},
@@ -429,14 +430,13 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 			name: "Not enough cache size with getter",
 			cache: New(
 				WithSize[int, int](dataCount/5),
-				WithGetter[int, int](func(ctx context.Context, key int) (int, error) { return key, nil }),
+				WithGetter(func(_ context.Context, key int) (int, error) { return key, nil }),
 			),
 			expectedLen: dataCount / 5,
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			testConcurrent(tt.cache, tt.expectedLen)
