@@ -1,24 +1,26 @@
-name: CI
+name: Check
 
 on:
   push:
 
 env:
-  EARTHLY_VERSION: 0.7.20
-
+  EARTHLY_VERSION: 0.8.16
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    name: check (${{ matrix.go}})
+    strategy:
+      matrix:
+        go: [1.23.x, 1.24.x, 1.25.0-rc.2]
     steps:
       - uses: earthly/actions-setup@v1
         with:
           version: ${{ env.EARTHLY_VERSION }}
-          use-cache: true
+          use-cache: false
       - uses: actions/checkout@v3
-
+      - run: echo "go_version=${{ matrix.go }}" >> .arg
       - name: Lint
         run: earthly --ci +lint
-
       - name: Test
         run: earthly --ci +test

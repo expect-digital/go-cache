@@ -80,6 +80,7 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) { //nolint:iret
 
 				return el.Value.val, nil
 			}
+
 			c.mu.Unlock()
 		} else {
 			c.mu.RUnlock()
@@ -124,7 +125,8 @@ func (c *Cache[K, V]) populateByGetter(ctx context.Context, key K) (V, error) { 
 	}
 
 	// Add the new value to the cache.
-	if err := c.Set(ctx, key, msg.value); err != nil {
+	err := c.Set(ctx, key, msg.value)
+	if err != nil {
 		return zeroValue[V](), fmt.Errorf("set value for key: %v: %w", key, err)
 	}
 
@@ -213,7 +215,8 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V) error {
 		return nil
 	}
 
-	if err := c.evictExpired(ctx); err != nil {
+	err := c.evictExpired(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -262,7 +265,8 @@ func (c *Cache[K, V]) evictExpired(ctx context.Context) error {
 			continue
 		}
 
-		if err := c.evict(ctx, v); err != nil {
+		err := c.evict(ctx, v)
+		if err != nil {
 			return err
 		}
 	}
