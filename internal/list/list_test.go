@@ -2,11 +2,9 @@ package list
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestList_PushFront(t *testing.T) {
+func TestListPushFront(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -21,7 +19,7 @@ func TestList_PushFront(t *testing.T) {
 	assertList(t, []string{"c", "b", "a"}, l)
 }
 
-func TestList_PushBack(t *testing.T) {
+func TestListPushBack(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -36,7 +34,7 @@ func TestList_PushBack(t *testing.T) {
 	assertList(t, []string{"a", "b", "c"}, l)
 }
 
-func TestList_Remove(t *testing.T) {
+func TestListRemove(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -63,7 +61,7 @@ func TestList_Remove(t *testing.T) {
 	assertList(t, nil, l)
 }
 
-func TestList_InsertAfter(t *testing.T) {
+func TestListInsertAfter(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -77,7 +75,7 @@ func TestList_InsertAfter(t *testing.T) {
 	assertList(t, []string{"a", "b", "c"}, l)
 }
 
-func TestList_InsertBefore(t *testing.T) {
+func TestListInsertBefore(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -93,7 +91,7 @@ func TestList_InsertBefore(t *testing.T) {
 	assertList(t, []string{"a", "b", "c"}, l)
 }
 
-func TestList_MoveAfter(t *testing.T) {
+func TestListMoveAfter(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -108,7 +106,7 @@ func TestList_MoveAfter(t *testing.T) {
 	assertList(t, []string{"b", "a"}, l)
 }
 
-func TestList_MoveToFront(t *testing.T) {
+func TestListMoveToFront(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -123,7 +121,7 @@ func TestList_MoveToFront(t *testing.T) {
 	assertList(t, []string{"b", "a"}, l)
 }
 
-func TestList_MoveToBack(t *testing.T) {
+func TestListMoveToBack(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -138,7 +136,7 @@ func TestList_MoveToBack(t *testing.T) {
 	assertList(t, []string{"b", "a"}, l)
 }
 
-func TestList_MoveBefore(t *testing.T) {
+func TestListMoveBefore(t *testing.T) {
 	t.Parallel()
 
 	l := New[string]()
@@ -153,32 +151,46 @@ func TestList_MoveBefore(t *testing.T) {
 	assertList(t, []string{"b", "a"}, l)
 }
 
-func assertList[V any](t *testing.T, expected []V, l *List[V]) {
+func assertList[V comparable](t *testing.T, expected []V, l *List[V]) {
 	t.Helper()
 
-	assert.Equal(t, len(expected), l.Len(), expected)
-
 	if len(expected) == 0 {
-		assert.Nil(t, l.Front(), expected)
-		assert.Nil(t, l.Back(), expected)
+		if l.Front() != nil {
+			t.Errorf("want nil front, got %v", l.Front())
+		}
+
+		if l.Back() != nil {
+			t.Errorf("want nil back, got %v", l.Back())
+		}
 
 		return
 	}
 
-	assert.Equal(t, l.Front().Value, expected[0], expected)
-	assert.Equal(t, l.Back().Value, expected[len(expected)-1], expected)
+	if expected[0] != l.Front().Value {
+		t.Errorf("want front %v, got %v", expected[0], l.Front().Value)
+	}
+
+	if expected[len(expected)-1] != l.Back().Value {
+		t.Errorf("want back %v, got %v", expected[len(expected)-1], l.Back().Value)
+	}
 
 	el := l.Front()
 
-	for _, v := range expected {
-		assert.Equal(t, v, el.Value, expected)
+	for i, v := range expected {
+		if v != el.Value {
+			t.Errorf("want %v at %d, got %v", v, i, el.Value)
+		}
+
 		el = el.Next()
 	}
 
 	el = l.Back()
 
 	for i := len(expected) - 1; i >= 0; i-- {
-		assert.Equal(t, expected[i], el.Value, expected)
+		if expected[i] != el.Value {
+			t.Errorf("want %v at %d, got %v", expected[i], i, el.Value)
+		}
+
 		el = el.Prev()
 	}
 }

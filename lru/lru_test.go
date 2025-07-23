@@ -4,27 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/quick"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
-func Test_WithSize(t *testing.T) {
+func TestWithSize(t *testing.T) {
 	t.Parallel()
 
 	c := New(WithSize[int, int](10))
 
-	assert.Equal(t, 10, c.Size())
-	assert.Zero(t, c.Len())
+	if c.Size() != 10 {
+		t.Errorf("want size 10, got %d", c.Size())
+	}
+
+	if c.Len() != 0 {
+		t.Errorf("want empty, got %d", c.Len())
+	}
 }
 
-func Test_WithTTL(t *testing.T) {
+func TestWithTTL(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -32,22 +36,32 @@ func Test_WithTTL(t *testing.T) {
 	c := New(WithTTL[int, string](ttl))
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	v, err := c.Get(ctx, 1)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
-	require.NoError(t, err)
-	assert.Equal(t, "one", v)
+	if v != "one" {
+		t.Errorf("want value 'one', got %q", v)
+	}
 
 	time.Sleep(ttl)
 
 	v, err = c.Get(ctx, 1)
+	if err == nil {
+		t.Errorf("want % error, got nil", ErrNotFound)
+	}
 
-	require.ErrorIs(t, err, ErrNotFound)
-	assert.Empty(t, v)
+	if v != "" {
+		t.Errorf("want empty value, got %q", v)
+	}
 }
 
-func Test_WithGetter(t *testing.T) {
+func TestWithGetter(t *testing.T) {
 	t.Parallel()
 
 	err := quick.Check(func(key int, value string) bool {
@@ -70,11 +84,12 @@ func Test_WithGetter(t *testing.T) {
 
 		return value == v && err == nil
 	}, nil)
-
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 }
 
-func Test_WithGetterParallel(t *testing.T) {
+func TestWithGetterParallel(t *testing.T) {
 	t.Parallel()
 
 	key, value := 1, "OK"
@@ -111,11 +126,17 @@ func Test_WithGetterParallel(t *testing.T) {
 		})
 	}
 
-	require.NoError(t, eg.Wait())
-	assert.EqualValues(t, 1, count)
+	err := eg.Wait()
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("want count 1, got %d", count)
+	}
 }
 
-func Test_GetterPanics(t *testing.T) {
+func TestGetterPanics(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -134,9 +155,14 @@ func Test_GetterPanics(t *testing.T) {
 	for range n {
 		go func() {
 			v, err := c.Get(context.Background(), 1)
+			if err == nil || !strings.Contains(err.Error(), "panic") {
+				t.Errorf("want panic error, got %v", err)
+			}
 
-			assert.ErrorContains(t, err, "panic")
-			assert.Empty(t, v)
+			if v != "" {
+				t.Errorf("want empty value, got %s", v)
+			}
+
 			wg.Done()
 		}()
 	}
@@ -144,7 +170,7 @@ func Test_GetterPanics(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_GetterReturnsError(t *testing.T) {
+func TestGetterReturnsError(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -157,10 +183,12 @@ func Test_GetterReturnsError(t *testing.T) {
 
 	_, err := c.Get(context.Background(), 1)
 
-	require.ErrorContains(t, err, "fail test")
+	if !strings.Contains(err.Error(), "fail test") {
+		t.Errorf("want fail test error, got %v", err)
+	}
 }
 
-func Test_OnEvictPanics(t *testing.T) {
+func TestOnEvictPanics(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -173,17 +201,23 @@ func Test_OnEvictPanics(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
+	if !strings.Contains(err.Error(), "evict expired value: evict value for key: 1: panic") {
+		t.Errorf("want evict expired value: evict value for key: 1: panic, got %v", err)
+	}
 
-	require.EqualError(t, err, "evict expired value: evict value for key: 1: panic")
-	assert.Empty(t, v)
+	if v != "" {
+		t.Errorf("want empty value, got %s", v)
+	}
 }
 
-func Test_OnEvictReturnsError(t *testing.T) {
+func TestOnEvictReturnsError(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -196,17 +230,23 @@ func Test_OnEvictReturnsError(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
+	if !strings.Contains(err.Error(), "evict expired value: evict value for key: 1: oops") {
+		t.Errorf("want evict expired value: evict value for key: 1: oops, got %v", err)
+	}
 
-	require.EqualError(t, err, "evict expired value: evict value for key: 1: oops")
-	assert.Empty(t, v)
+	if v != "" {
+		t.Errorf("want empty, got %s", v)
+	}
 }
 
-func Test_OnEvictOK(t *testing.T) {
+func TestOnEvictOK(t *testing.T) {
 	t.Parallel()
 
 	c := New(
@@ -219,17 +259,23 @@ func Test_OnEvictOK(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	time.Sleep(time.Millisecond)
 
 	v, err := c.Get(ctx, 1)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("want ErrNotFound, got %v", err)
+	}
 
-	require.ErrorIs(t, err, ErrNotFound)
-	assert.Empty(t, v)
+	if v != "" {
+		t.Errorf("want empty, got %s", v)
+	}
 }
 
-func Test_GetOneKeyMultipleTimes(t *testing.T) {
+func TestGetOneKeyMultipleTimes(t *testing.T) {
 	t.Parallel()
 
 	var getterExecCount int
@@ -245,16 +291,22 @@ func Test_GetOneKeyMultipleTimes(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := c.Get(ctx, 1)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	_, err = c.Get(ctx, 1)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	// Getter should be called only once, second time the value is from the cache.
-	assert.Equal(t, 1, getterExecCount)
+	if getterExecCount != 1 {
+		t.Errorf("want getter called once, got %d times", getterExecCount)
+	}
 }
 
-func Test_UpdateKey(t *testing.T) {
+func TestUpdateKey(t *testing.T) {
 	t.Parallel()
 
 	c := New[int, string]()
@@ -262,23 +314,36 @@ func Test_UpdateKey(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	err = c.Set(ctx, 1, "two")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	v, err := c.Get(ctx, 1)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	// The value should be updated.
-	require.Equal(t, "two", v)
+	if v != "two" {
+		t.Errorf("want value 'two', got %q", v)
+	}
 
 	// The length should be 1, as the key is updated, not added.
-	require.Equal(t, 1, c.Len())
-	require.Len(t, c.lookup, 1)
+	if c.Len() != 1 {
+		t.Errorf("want length 1, got %d", c.Len())
+	}
+
+	if len(c.lookup) != 1 {
+		t.Errorf("want lookup length 1, got %d", len(c.lookup))
+	}
 }
 
-func Test_EvictLeastRecent(t *testing.T) {
+func TestEvictLeastRecent(t *testing.T) {
 	t.Parallel()
 
 	c := New(WithSize[int, string](2))
@@ -286,23 +351,36 @@ func Test_EvictLeastRecent(t *testing.T) {
 	ctx := context.Background()
 
 	err := c.Set(ctx, 1, "one")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	err = c.Set(ctx, 2, "two")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	_, err = c.Get(ctx, 1)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	err = c.Set(ctx, 3, "three")
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	v, err := c.Get(ctx, 2)
-	require.ErrorIs(t, err, ErrNotFound)
-	require.Empty(t, v)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+
+	if v != "" {
+		t.Errorf("want empty, got %s", v)
+	}
 }
 
-func Test_CacheWithLargeCacheSize(t *testing.T) {
+func TestCacheWithLargeCacheSize(t *testing.T) {
 	t.Parallel()
 
 	cacheSize := 10000
@@ -311,7 +389,10 @@ func Test_CacheWithLargeCacheSize(t *testing.T) {
 	c := New(WithSize[int, int](cacheSize))
 
 	for i := range dataSize {
-		require.NoError(t, c.Set(context.Background(), i, i))
+		err := c.Set(context.Background(), i, i)
+		if err != nil {
+			t.Fatalf("want no error, got %v", err)
+		}
 	}
 
 	for i := range dataSize {
@@ -319,16 +400,26 @@ func Test_CacheWithLargeCacheSize(t *testing.T) {
 
 		// The cache should contain only the last cSize items.
 		if i < dataSize-cacheSize {
-			require.ErrorIs(t, err, ErrNotFound)
-			require.Empty(t, v)
+			if !errors.Is(err, ErrNotFound) {
+				t.Errorf("want ErrNotFound, got %v", err)
+			}
+
+			if v != 0 {
+				t.Errorf("want zero, got %d", v)
+			}
 		} else {
-			require.NoError(t, err)
-			require.Equal(t, i, v)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+
+			if v != i {
+				t.Errorf("want %d, got %d", i, v)
+			}
 		}
 	}
 }
 
-func Test_EvictExpired(t *testing.T) {
+func TestEvictExpired(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -340,24 +431,42 @@ func Test_EvictExpired(t *testing.T) {
 	)
 
 	// Set a value with a TTL
-	require.NoError(t, c.Set(ctx, 1, 1))
-	require.NoError(t, c.Set(ctx, 2, 2))
+	err := c.Set(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
+
+	err = c.Set(ctx, 2, 2)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
 	time.Sleep(ttl * 2)
 
-	require.NoError(t, c.Set(ctx, 3, 3))
+	err = c.Set(ctx, 3, 3)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
-	require.Equal(t, 1, c.Len())
-	require.Equal(t, 2, c.Size())
+	if c.Len() != 1 {
+		t.Errorf("want length 1, got %d", c.Len())
+	}
+
+	if c.Size() != 2 {
+		t.Errorf("want size 2, got %d", c.Size())
+	}
 
 	v, err := c.Get(ctx, 3)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("want no error, got %v", err)
+	}
 
-	require.Equal(t, 3, v)
+	if v != 3 {
+		t.Errorf("want 3, got %d", v)
+	}
 }
 
-//nolint:funlen
-func Test_ConcurrentGetAndSet(t *testing.T) {
+func TestConcurrentGetAndSet(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -372,7 +481,10 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 			defer wg.Done()
 
 			for i := range dataCount {
-				assert.NoError(t, c.Set(ctx, i, i))
+				err := c.Set(ctx, i, i)
+				if err != nil {
+					t.Errorf("want no error, got %v", err)
+				}
 			}
 		}()
 
@@ -386,12 +498,18 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 				// may or may not be in the cache.
 				switch err {
 				case nil:
-					assert.Equal(t, i, val)
+					if i != val {
+						t.Errorf("want %d, got %d", i, val)
+					}
 				default:
 					if c.getter == nil {
-						assert.ErrorIs(t, err, ErrNotFound)
+						if !errors.Is(err, ErrNotFound) {
+							t.Errorf("want ErrNotFound, got %v", err)
+						}
 					} else {
-						assert.Fail(t, "getter is not nil and could not get the value", err)
+						if !strings.Contains(err.Error(), "getter is not nil and could not get the value") {
+							t.Errorf("want getter is not nil and could not get the value, got %v", err)
+						}
 					}
 				}
 			}
@@ -399,8 +517,13 @@ func Test_ConcurrentGetAndSet(t *testing.T) {
 
 		wg.Wait()
 
-		require.Equal(t, expectedLen, c.Len())
-		require.Equal(t, expectedLen, c.Size())
+		if c.Len() != expectedLen {
+			t.Errorf("want length %d, got %d", expectedLen, c.Len())
+		}
+
+		if c.Size() != expectedLen {
+			t.Errorf("want size %d, got %d", expectedLen, c.Size())
+		}
 	}
 
 	tests := []struct {
