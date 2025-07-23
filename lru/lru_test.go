@@ -407,14 +407,16 @@ func TestCacheWithLargeCacheSize(t *testing.T) {
 			if v != 0 {
 				t.Errorf("want zero, got %d", v)
 			}
-		} else {
-			if err != nil {
-				t.Fatalf("want no error, got %v", err)
-			}
 
-			if v != i {
-				t.Errorf("want %d, got %d", i, v)
-			}
+			continue
+		}
+
+		if err != nil {
+			t.Fatalf("want no error, got %v", err)
+		}
+
+		if v != i {
+			t.Errorf("want %d, got %d", i, v)
 		}
 	}
 }
@@ -466,11 +468,11 @@ func TestEvictExpired(t *testing.T) {
 	}
 }
 
-func TestConcurrentGetAndSet(t *testing.T) {
+func TestConcurrentGetAndSet(t *testing.T) { //nolint:cyclop,funlen,gocognit
 	t.Parallel()
 
 	ctx := context.Background()
-	dataCount := 2000
+	n := 2000
 
 	testConcurrent := func(c *Cache[int, int], expectedLen int) {
 		var wg sync.WaitGroup
@@ -480,7 +482,7 @@ func TestConcurrentGetAndSet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			for i := range dataCount {
+			for i := range n {
 				err := c.Set(ctx, i, i)
 				if err != nil {
 					t.Errorf("want no error, got %v", err)
@@ -491,25 +493,23 @@ func TestConcurrentGetAndSet(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			for i := range dataCount {
+			for i := range n {
 				val, err := c.Get(ctx, i)
 
 				// As getting and setting are executed concurrently, the value
 				// may or may not be in the cache.
-				switch err {
-				case nil:
+				switch {
+				default:
+					if !strings.Contains(err.Error(), "getter is not nil and could not get the value") {
+						t.Errorf("want getter is not nil and could not get the value, got %v", err)
+					}
+				case err == nil:
 					if i != val {
 						t.Errorf("want %d, got %d", i, val)
 					}
-				default:
-					if c.getter == nil {
-						if !errors.Is(err, ErrNotFound) {
-							t.Errorf("want ErrNotFound, got %v", err)
-						}
-					} else {
-						if !strings.Contains(err.Error(), "getter is not nil and could not get the value") {
-							t.Errorf("want getter is not nil and could not get the value, got %v", err)
-						}
+				case c.getter == nil:
+					if !errors.Is(err, ErrNotFound) {
+						t.Errorf("want ErrNotFound, got %v", err)
 					}
 				}
 			}
@@ -527,42 +527,34 @@ func TestConcurrentGetAndSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		cache       *Cache[int, int]
-		expectedLen int
-	}{
-		{
-			name:        "Enough cache size without getter",
-			cache:       New(WithSize[int, int](dataCount)),
-			expectedLen: dataCount,
-		},
-		{
-			name:        "Not enough cache size without getter",
-			cache:       New(WithSize[int, int](dataCount / 5)),
-			expectedLen: dataCount / 5,
-		},
-		{
-			name: "Enough cache size with getter",
-			cache: New(
-				WithSize[int, int](dataCount),
-				WithGetter(func(_ context.Context, key int) (int, error) { return key, nil }),
-			),
-			expectedLen: dataCount,
-		},
-		{
-			name: "Not enough cache size with getter",
-			cache: New(
-				WithSize[int, int](dataCount/5),
-				WithGetter(func(_ context.Context, key int) (int, error) { return key, nil }),
-			),
-			expectedLen: dataCount / 5,
-		},
-	}
+		name  string
+		cache *Cache[int, int]
+		n     int
+	}{{
+		name:  "Enough cache size without getter",
+		cache: New(WithSize[int, int](n)),
+		n:     n,
+	}, {
+		name:  "Not enough cache size without getter",
+		cache: New(WithSize[int, int](n / 5)),
+		n:     n / 5,
+	}, {
+		name:  "Enough cache size with getter",
+		cache: New(WithSize[int, int](n), WithGetter(func(_ context.Context, key int) (int, error) { return key, nil })),
+		n:     n,
+	}, {
+		name: "Not enough cache size with getter",
+		cache: New(
+			WithSize[int, int](n/5),
+			WithGetter(func(_ context.Context, key int) (int, error) { return key, nil }),
+		),
+		n: n / 5,
+	}}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			testConcurrent(tt.cache, tt.expectedLen)
+			testConcurrent(test.cache, test.n)
 		})
 	}
 }

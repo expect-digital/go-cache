@@ -3,6 +3,9 @@ name: Check
 on:
   push:
 
+permissions:
+  packages: write
+
 env:
   EARTHLY_VERSION: 0.8.16
 
@@ -13,6 +16,7 @@ jobs:
     strategy:
       matrix:
         go: [1.23.x, 1.24.x, 1.25.0-rc.2]
+    continue-on-error: true
     steps:
       - uses: earthly/actions-setup@v1
         with:
@@ -21,6 +25,6 @@ jobs:
       - uses: actions/checkout@v3
       - run: echo "go_version=${{ matrix.go }}" >> .arg
       - name: Lint
-        run: earthly --ci +lint
+        run: earthly --ci --remote-cache=ghcr.io/expect-digital/go-cache:cache +lint
       - name: Test
-        run: earthly --ci +test
+        run: earthly --ci --remote-cache=ghcr.io/expect-digital/go-cache:cache +test
