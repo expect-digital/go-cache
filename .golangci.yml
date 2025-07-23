@@ -1,0 +1,25 @@
+run:
+  timeout: 1m
+linters:
+  enable-all: true
+  disable:
+    - deadcode
+    - depguard
+    - exhaustruct
+    - gofmt
+    - goimports
+    - golint
+    - ifshort
+    - interfacer
+    - maligned
+    - nonamedreturns
+    - nosnakecase
+    - scopelint
+    - structcheck
+    - testpackage
+    - varcheck
+    - varnamelen
+    - exhaustivestruct
+    - forbidigo
+    - godox
+    - goerr113
