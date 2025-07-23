@@ -1,10 +1,12 @@
 module go.expect.digital/cache
 
-go 1.23
+go 1.23.0
+
+toolchain go1.24.5
 
 require (
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
