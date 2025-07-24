@@ -19,7 +19,7 @@ jobs:
         with:
           version: ${{ env.EARTHLY_VERSION }}
           use-cache: false
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: echo "go_version=${{ matrix.go }}" >> .arg
       - name: Lint
         run: earthly --ci +lint
