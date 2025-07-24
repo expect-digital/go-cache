@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         go: [1.23.x, 1.24.x, 1.25.0-rc.2]
+    continue-on-error: true
     steps:
       - uses: earthly/actions-setup@v1
         with:

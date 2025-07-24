@@ -22,7 +22,7 @@ lint:
     --mount=type=cache,id=go-mod,target=/go/pkg/mod \
     --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     --mount type=cache,id=golangci,target=/root/.cache/golangci_lint \
-    golangci-lint run --timeout 3m -v
+    golangci-lint run --timeout 3m
 
 test:
   FROM +src
