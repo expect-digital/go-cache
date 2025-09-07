@@ -1,6 +1,6 @@
 VERSION 0.8
-ARG go_version=1.24.5
-FROM golang:$go_version-alpine
+ARG go_version=1.24.5-alpine
+FROM golang:$go_version
 
 src:
   ENV CGO_ENABLED=0
@@ -13,8 +13,8 @@ src:
   SAVE ARTIFACT /src
 
 lint:
-  ARG golangci_lint_version=2.3.0
-  FROM golangci/golangci-lint:v$golangci_lint_version-alpine
+  ARG golangci_lint_version=2.3.0-alpine
+  FROM golangci/golangci-lint:v$golangci_lint_version
   WORKDIR /src
   COPY .golangci.yml .
   COPY --dir +src/src /

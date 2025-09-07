@@ -8,11 +8,11 @@ env:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     name: check (${{ matrix.go}})
     strategy:
       matrix:
-        go: [1.23.x, 1.24.x, 1.25.0-rc.2]
+        go: [1.23, 1.24, 1.25]
     continue-on-error: true
     steps:
       - uses: earthly/actions-setup@v1
