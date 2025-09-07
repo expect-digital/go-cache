@@ -15,7 +15,7 @@ jobs:
         go: [1.23, 1.24, 1.25]
     continue-on-error: true
     steps:
-      - uses: earthly/actions-setup@v1
+      - uses: EarthBuild/actions-setup@main
         with:
           version: ${{ env.EARTHLY_VERSION }}
           use-cache: false
@@ -25,3 +25,5 @@ jobs:
         run: earthly --ci +lint
       - name: Test
         run: earthly --ci +test
+      - name: Go Vulnerability Check
+        run: earthly --ci +govulncheck

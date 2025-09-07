@@ -1,6 +1,6 @@
 VERSION 0.8
-ARG go_version=1.25.1-alpine@sha256:b6ed3fd0452c0e9bcdef5597f29cc1418f61672e9d3a2f55bf02e7222c014abd
-FROM golang:$go_version
+ARG go_version=1.25.1
+FROM golang:$go_version-alpine
 WORKDIR /src
 
 src:
@@ -15,8 +15,8 @@ src:
 
 # lint runs all linters for golang
 lint:
-  ARG golangci_lint_version=2.4.0-alpine
-  FROM golangci/golangci-lint:v$golangci_lint_version
+  ARG golangci_lint_version=2.4.0
+  FROM golangci/golangci-lint:v$golangci_lint_version-alpine
   WORKDIR /src
   COPY .golangci.yml .
   COPY --dir +src/src /
