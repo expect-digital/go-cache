@@ -13,7 +13,7 @@ src:
   SAVE ARTIFACT /src
 
 lint:
-  ARG golangci_lint_version=2.3.0-alpine
+  ARG golangci_lint_version=2.4.0-alpine
   FROM golangci/golangci-lint:v$golangci_lint_version
   WORKDIR /src
   COPY .golangci.yml .
