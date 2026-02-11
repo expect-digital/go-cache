@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"go.expect.digital/cache/internal/list"
+	"go.expect.digital/cache/internal/linked"
 )
 
 const defaultSize = 1024
@@ -32,8 +32,8 @@ type Cache[K comparable, V any] struct {
 	ttl     time.Duration
 	getter  Getter[K, V]
 	onEvict OnEvict[V]
-	cache   *list.List[listValue[K, V]]
-	lookup  map[K]*list.Element[listValue[K, V]]
+	cache   *linked.List[listValue[K, V]]
+	lookup  map[K]*linked.Element[listValue[K, V]]
 	pending map[K][]chan getterResult[V]
 	mu      sync.RWMutex
 }
@@ -228,7 +228,7 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V) error {
 }
 
 // evict removes the element from the cache.
-func (c *Cache[K, V]) evict(ctx context.Context, el *list.Element[listValue[K, V]]) (err error) {
+func (c *Cache[K, V]) evict(ctx context.Context, el *linked.Element[listValue[K, V]]) (err error) {
 	c.cache.Remove(el)
 	delete(c.lookup, el.Value.key)
 
@@ -346,8 +346,8 @@ func New[K comparable, V any](options ...Option[K, V]) *Cache[K, V] {
 		c.n = defaultSize
 	}
 
-	c.cache = list.New[listValue[K, V]]()
-	c.lookup = make(map[K]*list.Element[listValue[K, V]])
+	c.cache = linked.New[listValue[K, V]]()
+	c.lookup = make(map[K]*linked.Element[listValue[K, V]])
 	c.pending = make(map[K][]chan getterResult[V])
 
 	return c
