@@ -1,4 +1,4 @@
-package list
+package linked
 
 import (
 	"testing"

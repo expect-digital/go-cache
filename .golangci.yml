@@ -10,6 +10,7 @@ linters:
     - nonamedreturns
     - testpackage
     - varnamelen
+    - wsl # deprecated
   exclusions:
     generated: lax
     presets:
