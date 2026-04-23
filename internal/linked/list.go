@@ -1,4 +1,4 @@
-package list
+package linked
 
 // Element represents a list element.
 type Element[V any] struct {
