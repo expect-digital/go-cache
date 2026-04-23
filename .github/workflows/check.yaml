@@ -16,8 +16,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: echo "go_version=${{ matrix.go }}" >> .arg
       - name: Lint
-        run: earthly --ci +lint
+        run: earth  --ci +lint
       - name: Test
-        run: earthly --ci +test
+        run: earth --ci +test
       - name: Go Vulnerability Check
-        run: earthly --ci +govulncheck
+        run: earth --ci +govulncheck
