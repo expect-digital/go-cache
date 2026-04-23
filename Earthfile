@@ -1,5 +1,6 @@
 VERSION 0.8
-ARG go_version=1.25.1
+# renovate: datasource=docker depName=golang
+ARG go_version=1.26.0
 FROM golang:$go_version-alpine
 WORKDIR /src
 
@@ -15,7 +16,8 @@ src:
 
 # lint runs all linters for golang
 lint:
-  ARG golangci_lint_version=2.4.0
+  # renovate: datasource=docker depName=golangci/golangci-lint
+  ARG golangci_lint_version=2.9.0
   FROM golangci/golangci-lint:v$golangci_lint_version-alpine
   WORKDIR /src
   COPY .golangci.yml .
