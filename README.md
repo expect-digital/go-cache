@@ -16,7 +16,7 @@ Go-Cache is a high-performance, thread-safe library that provides a Least Recent
 
 ### Prerequisites
 
-- Go version 1.18 or higher
+- Go version 1.24 or higher
 
 ### Installation
 
