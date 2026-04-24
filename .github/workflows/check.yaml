@@ -12,12 +12,12 @@ jobs:
     name: check (${{ matrix.go}})
     strategy:
       matrix:
-        go: [ 1.24, 1.25, 1.26 ]
+        go: [ 1.24, 1.25, 1.26 ] # TODO(jhorsts): pin digests
     continue-on-error: true
     steps:
       - uses: EarthBuild/actions-setup@c3d7101aa2728cbf8e1930480c0b00867d495db5 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - run: echo "go_version=${{ matrix.go }}" >> .arg
+      - run: echo "go_version=${{ matrix.go }}-alpine3.23" >> .arg
       - name: Lint
         run: earth  --ci +lint
       - name: Test
