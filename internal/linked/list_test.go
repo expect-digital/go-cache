@@ -1,6 +1,7 @@
 package linked
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -186,9 +187,9 @@ func assertList[V comparable](t *testing.T, expected []V, l *List[V]) {
 
 	el = l.Back()
 
-	for i := len(expected) - 1; i >= 0; i-- {
-		if expected[i] != el.Value {
-			t.Errorf("want %v at %d, got %v", expected[i], i, el.Value)
+	for i, v := range slices.Backward(expected) {
+		if v != el.Value {
+			t.Errorf("want %v at %d, got %v", v, i, el.Value)
 		}
 
 		el = el.Prev()
