@@ -15,7 +15,7 @@ jobs:
         go: [ 1.24, 1.25, 1.26 ] # TODO(jhorsts): pin digests
     continue-on-error: true
     steps:
-      - uses: EarthBuild/actions-setup@3b5a285706ce2bffa5313bbbd40146404890b03f # main
+      - uses: EarthBuild/actions-setup@ad12d08e2d457fc6cdc11aed92618318abe91c41 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: echo "go_version=${{ matrix.go }}-alpine3.23" >> .arg
       - name: Lint
