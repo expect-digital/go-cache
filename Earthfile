@@ -1,6 +1,6 @@
 VERSION 0.8
 # renovate: datasource=docker depName=golang
-ARG go_version=1.26.6-alpine3.23@sha256:e57c41c1d5864341031181b0db34b9a537bb5773eb6428e4e5bdaea0f9135406
+ARG go_version=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
 FROM golang:$go_version
 WORKDIR /src
 
