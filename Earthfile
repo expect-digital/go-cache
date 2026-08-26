@@ -1,6 +1,6 @@
 VERSION 0.8
 # renovate: datasource=docker depName=golang
-ARG go_version=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
+ARG go_version=1.27.0-alpine3.24@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc
 FROM golang:$go_version
 WORKDIR /src
 
@@ -40,7 +40,7 @@ test:
 govulncheck:
   RUN apk add git
   # renovate: datasource=go depName=golang.org/x/vuln/cmd/govulncheck
-  ARG govulncheck_version=v1.1.4
+  ARG govulncheck_version=v1.7.0
   RUN go install golang.org/x/vuln/cmd/govulncheck@$govulncheck_version
   COPY --dir +src/src /
   RUN govulncheck ./...
