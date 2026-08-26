@@ -40,7 +40,7 @@ test:
 govulncheck:
   RUN apk add git
   # renovate: datasource=go depName=golang.org/x/vuln/cmd/govulncheck
-  ARG govulncheck_version=v1.1.4
+  ARG govulncheck_version=v1.7.0
   RUN go install golang.org/x/vuln/cmd/govulncheck@$govulncheck_version
   COPY --dir +src/src /
   RUN govulncheck ./...
