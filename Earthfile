@@ -17,7 +17,7 @@ src:
 # lint runs all linters for golang
 lint:
   # renovate: datasource=docker depName=golangci/golangci-lint
-  ARG golangci_lint_version=v2.12.2-alpine@sha256:91b27804074a0bacea298707f016911e60cf0cdbc6c7bf5ccacb5f0606d18d60
+  ARG golangci_lint_version=v2.13.1-alpine@sha256:f5e7bd15e2dce6f78f976acc07075f3208ce1a39b78f245f1ea984b2a39d105c
   FROM golangci/golangci-lint:$golangci_lint_version
   WORKDIR /src
   COPY .golangci.yml .
