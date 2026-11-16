@@ -45,8 +45,18 @@ govulncheck:
   COPY --dir +src/src /
   RUN govulncheck ./...
 
+# zizmor audits GitHub Actions workflows
+zizmor:
+  # renovate: datasource=docker depName=ghcr.io/zizmorcore/zizmor
+  ARG zizmor_version=1.32.0@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d
+  FROM ghcr.io/zizmorcore/zizmor:$zizmor_version
+  WORKDIR /src
+  COPY --dir .github .
+  RUN zizmor --offline --strict-collection .github
+
 # check verifies code quality by running linters and tests
 check:
   BUILD +lint
   BUILD +test
   BUILD +govulncheck
+  BUILD +zizmor

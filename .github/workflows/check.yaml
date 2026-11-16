@@ -7,6 +7,17 @@ permissions:
   contents: read
 
 jobs:
+  zizmor:
+    runs-on: ubuntu-26.04-arm
+    name: zizmor
+    steps:
+      - uses: earthbuild/actions-setup@f4d20223e70dbb43b5fc08c4d857ab9cf0dbf3ae # v2.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Zizmor
+        run: earth --ci +zizmor
+
   check:
     runs-on: ubuntu-26.04
     name: check (${{ matrix.go}})
@@ -17,6 +28,8 @@ jobs:
     steps:
       - uses: earthbuild/actions-setup@f4d20223e70dbb43b5fc08c4d857ab9cf0dbf3ae # v2.2.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: echo "go_version=${{ matrix.go }}-alpine3.24" >> .arg
       - name: Lint
         run: earth  --ci +lint
