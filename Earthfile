@@ -48,7 +48,7 @@ govulncheck:
 # zizmor audits GitHub Actions workflows
 zizmor:
   # renovate: datasource=docker depName=ghcr.io/zizmorcore/zizmor
-  ARG zizmor_version=1.32.0@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d
+  ARG zizmor_version=1.33.1@sha256:ecd3ffe6158de1322e05a044ed43749bee12b1dccb7e1a7859bc6ac4b2a1c516
   FROM ghcr.io/zizmorcore/zizmor:$zizmor_version
   WORKDIR /src
   COPY --dir .github .
